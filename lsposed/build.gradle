@@ -1,0 +1,5 @@
+// 顶层构建文件。真机编译需要 Android SDK + Gradle(AGP 8.x)。
+// 命令：cd lsposed && ./gradlew assembleDebug  → app/build/outputs/apk/debug/app-debug.apk
+plugins {
+    id 'com.android.application' version '8.5.2' apply false
+}

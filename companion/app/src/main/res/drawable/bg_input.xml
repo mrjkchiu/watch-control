@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 输入框：surface_2 底 + 1dp 描边 + 8dp 圆角。与 bg_btn_secondary 同系，视觉上比按钮更"凹"，便于识别可编辑。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/surface_2" />
+    <stroke android:width="1dp" android:color="@color/line" />
+    <corners android:radius="8dp" />
+</shape>

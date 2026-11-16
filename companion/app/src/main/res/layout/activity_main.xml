@@ -1,0 +1,640 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  腕控 · 互联控制台（0.1.9 UI 全面重做）
+
+  impeccable 设计原则在 Android View 体系的落地：
+  · distill 去噪：删掉常驻 24 行 GUIDE（收进「使用说明」折叠，默认收起）、合并重复标题、
+    删除对两条通道的反复解释；一个主操作 + 三个次级，不再 4 按钮挤一行。
+  · 状态优先：首屏第一眼是「当前链路」大号读数 + 5 行链路读数；日志是主角但退到下半屏独立滚动。
+  · typography：5 档固定字号（27 / 19 / 12.5 / 11.5 / 10.5sp），层级靠字号+字重+留白共同建立。
+  · spatial：4dp 基准间距；读数区用 1dp 细线分组（数据栅格），不套卡片、不加阴影。
+  · color：中性背景 60% / 文字读数 30% / 琥珀强调 10%（仅主按钮与状态竖条）。
+  链路代码 / 服务 / 广播协议一行不动；本文件只描述显示层。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg"
+    android:paddingLeft="20dp"
+    android:paddingRight="20dp"
+    android:paddingTop="20dp"
+    android:paddingBottom="16dp">
+
+    <!-- 品牌行：一个标题 + 一个版本号，不再与 ActionBar 重复 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="18dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="腕控"
+            android:textColor="@color/ink"
+            android:textSize="19sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04" />
+
+        <!-- A3：占位文本不写死版本号（会被 MainActivity.versionName() 运行时覆盖），
+             否则升版后布局里仍显示旧版本；用中性占位即可。 -->
+        <TextView
+            android:id="@+id/tv_ver"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="互联控制台"
+            android:textColor="@color/ink_3"
+            android:textSize="10.5sp"
+            android:typeface="monospace" />
+    </LinearLayout>
+
+    <!-- 当前链路：section label -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="当前链路"
+        android:textColor="@color/ink_3"
+        android:textSize="10.5sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.14"
+        android:layout_marginBottom="9dp" />
+
+    <!-- hero：左侧 3dp 琥珀竖条 + 大号状态词 + 如实副文案 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="18dp">
+
+        <View
+            android:id="@+id/hero_bar"
+            android:layout_width="3dp"
+            android:layout_height="match_parent"
+            android:background="@color/accent" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingLeft="14dp">
+
+            <TextView
+                android:id="@+id/tv_state"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="检测中"
+                android:textColor="@color/ink"
+                android:textSize="27sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false" />
+
+            <TextView
+                android:id="@+id/tv_state_sub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:text="正在拉取服务状态…"
+                android:textColor="@color/ink_2"
+                android:textSize="11.5sp"
+                android:lineSpacingExtra="3dp" />
+
+            <!-- 链路健康胶囊（v2 精化）：描述机制、不宣称当前"正常"，避免掉线时误导。
+                 纯静态展示，无新 ID、不动 Java；accent 点呼应单一强调色。 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="9dp"
+                android:paddingTop="5dp"
+                android:paddingBottom="5dp"
+                android:paddingLeft="11dp"
+                android:paddingRight="11dp"
+                android:background="@drawable/bg_pill"
+                android:text="●  心跳保活 · 断线自动重连"
+                android:textColor="@color/ink_2"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 链路读数：section label -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="链路读数"
+        android:textColor="@color/ink_3"
+        android:textSize="10.5sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.14"
+        android:layout_marginBottom="8dp" />
+
+    <!-- 读数区（v2 方案 A · 一行状态链）：5 项压成横向栅格，省一半以上纵向空间。
+         5 个 ID 全部保留，文本与语义着色仍由 MainActivity 运行时 setText/setTextColor 控制，
+         Java 一行不改。标签在上、读数在下；line 色 1dp 细线做分格，不套卡片、不加阴影。 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/line"
+        android:padding="1dp"
+        android:layout_marginBottom="18dp">
+
+        <!-- 前台服务 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:background="@color/bg"
+            android:paddingTop="8dp"
+            android:paddingBottom="9dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="前台服务"
+                android:textColor="@color/ink_3"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/tv_m_fg"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="—"
+                android:textColor="@color/idle"
+                android:textSize="13sp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:typeface="monospace" />
+        </LinearLayout>
+
+        <!-- 手表节点 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:background="@color/bg"
+            android:layout_marginStart="1dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="9dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="手表节点"
+                android:textColor="@color/ink_3"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/tv_m_node"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="—"
+                android:textColor="@color/idle"
+                android:textSize="13sp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:typeface="monospace" />
+        </LinearLayout>
+
+        <!-- 权限 / 监听 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:background="@color/bg"
+            android:layout_marginStart="1dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="9dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="权限/监听"
+                android:textColor="@color/ink_3"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/tv_m_listen"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="—"
+                android:textColor="@color/idle"
+                android:textSize="13sp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:typeface="monospace" />
+        </LinearLayout>
+
+        <!-- 指令引擎 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:background="@color/bg"
+            android:layout_marginStart="1dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="9dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="指令引擎"
+                android:textColor="@color/ink_3"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/tv_m_engine"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="—"
+                android:textColor="@color/idle"
+                android:textSize="13sp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:typeface="monospace" />
+        </LinearLayout>
+
+        <!-- 收发帧 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:background="@color/bg"
+            android:layout_marginStart="1dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="9dp"
+            android:paddingLeft="2dp"
+            android:paddingRight="2dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="收发帧"
+                android:textColor="@color/ink_3"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/tv_m_frames"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="—"
+                android:textColor="@color/idle"
+                android:textSize="13sp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:typeface="monospace" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 唯一主操作 -->
+    <TextView
+        android:id="@+id/btn_refresh"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_btn_primary"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:padding="12dp"
+        android:text="重新查询状态"
+        android:textColor="@color/on_accent"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.02"
+        android:layout_marginBottom="8dp" />
+
+    <!-- 三个次级操作：weight 等分，彻底消除横向溢出裁切 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp">
+
+        <TextView
+            android:id="@+id/btn_probe"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_btn_secondary"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:padding="10dp"
+            android:text="自检引擎"
+            android:textColor="@color/ink_2"
+            android:textSize="11.5sp" />
+
+        <TextView
+            android:id="@+id/btn_copy"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_btn_secondary"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:padding="10dp"
+            android:text="复制日志"
+            android:textColor="@color/ink_2"
+            android:textSize="11.5sp" />
+
+        <TextView
+            android:id="@+id/btn_restart"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_btn_secondary"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:padding="10dp"
+            android:text="重启服务"
+            android:textColor="@color/ink_2"
+            android:textSize="11.5sp" />
+    </LinearLayout>
+
+    <!-- 凭据入口：DSH token / cookie 手动设置与清除（渐进式披露，默认收起）。
+         纯显示层新增，不动任何链路 / 广播 / 引擎代码。保存后复用 COMPANION_SET 通道写本应用 SP，
+         下一条指令重建 DshClient 时读到新值即生效。状态只读"是否已配置"，绝不显示明文。 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_btn_secondary"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/cred_toggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingTop="11dp"
+            android:paddingBottom="11dp"
+            android:paddingLeft="13dp"
+            android:paddingRight="13dp"
+            android:text="DSH 凭据设置（手动 / 自愈测试）    ▾ 展开"
+            android:textColor="@color/ink_2"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:id="@+id/cred_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:paddingLeft="13dp"
+            android:paddingRight="13dp"
+            android:paddingBottom="13dp">
+
+            <TextView
+                android:id="@+id/cred_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="正在读取凭据状态…"
+                android:textColor="@color/ink_3"
+                android:textSize="10.5sp"
+                android:lineSpacingExtra="3dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="启动 Token（自愈抓不到时手填；引擎重启会变）"
+                android:textColor="@color/ink_3"
+                android:textSize="10sp" />
+
+            <EditText
+                android:id="@+id/cred_token"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_input"
+                android:hint="粘贴 dsh-go 启动 token…"
+                android:textColor="@color/ink"
+                android:textColorHint="@color/idle"
+                android:textSize="11.5sp"
+                android:typeface="monospace"
+                android:inputType="textVisiblePassword"
+                android:singleLine="true"
+                android:imeOptions="actionDone"
+                android:paddingLeft="11dp"
+                android:paddingRight="11dp"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="会话 Cookie（长期凭据，通常自动获取，一般不用手填）"
+                android:textColor="@color/ink_3"
+                android:textSize="10sp" />
+
+            <EditText
+                android:id="@+id/cred_cookie"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_input"
+                android:hint="粘贴 dsh-auth cookie…（留空=不改）"
+                android:textColor="@color/ink"
+                android:textColorHint="@color/idle"
+                android:textSize="11.5sp"
+                android:typeface="monospace"
+                android:inputType="textVisiblePassword"
+                android:singleLine="true"
+                android:imeOptions="actionDone"
+                android:paddingLeft="11dp"
+                android:paddingRight="11dp"
+                android:layout_marginBottom="10dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/cred_save"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.2"
+                    android:background="@drawable/bg_btn_primary"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
+                    android:text="保存凭据"
+                    android:textColor="@color/on_accent"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/cred_clear_token"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_btn_secondary"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
+                    android:text="清除 Token"
+                    android:textColor="@color/ink_2"
+                    android:textSize="10.5sp" />
+
+                <TextView
+                    android:id="@+id/cred_clear_cookie"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_btn_secondary"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
+                    android:text="清除 Cookie"
+                    android:textColor="@color/ink_2"
+                    android:textSize="10.5sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="9dp"
+                android:text="清除=写空值：下次发指令会触发自愈自动重取（用于测试）；自愈抓不到时在此手填。状态只显示是否配置，不显示明文；凭据只存本机。清空输入框再保存不会改动该项。"
+                android:textColor="@color/ink_3"
+                android:textSize="9.5sp"
+                android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 渐进式披露：说明书默认收起，点一行展开。内容已按 distill 从 24 行砍到 10 行 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+
+    <TextView
+        android:id="@+id/tv_guide_toggle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:text="使用说明与排障    ▾ 展开"
+        android:textColor="@color/ink_2"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/tv_guide_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:paddingBottom="14dp"
+        android:textColor="@color/ink_3"
+        android:textSize="11sp"
+        android:lineSpacingExtra="4dp"
+        android:text="装与授权\n· 手机端只需这一个「腕控」，装 1 个、打开 1 次；表端 rpk 不用重装。\n· WorkBuddy 通道需 root：KernelSU 里给本 App（com.example.watchctl）授权。\n\n两条独立通道，各自如实回执\n· 发到 DSH → 写入 dsh-go 引擎会话（session/prompt）。\n· 发到 WorkBuddy → 把文本预填进输入框，需在手机上点一次「发送」。\n  预填 ≠ 执行，面板不会把它标成「已送达」。\n\n连接自动维护\n· 心跳、断线重连、就绪通告、指令排队补发都不用手点。\n· 连不上时看下面「运行日志」里带 ✗ 的行，点「复制日志」发我即可排障。" />
+
+    <!-- 运行日志：section label + 筛选开关（全部 / 仅异常） -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="运行日志"
+            android:textColor="@color/ink_3"
+            android:textSize="10.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.14" />
+
+        <!-- 人话 / 原文 切换：默认人话（只显示有用信息），点一下看完整技术原文（排障用） -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tv_filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:background="@drawable/bg_btn_secondary"
+                android:text="全部"
+                android:textColor="@color/ink_2"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/tv_verbosity"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:background="@drawable/bg_btn_secondary"
+                android:text="人话"
+                android:textColor="@color/accent"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 日志区占满剩余高度、独立滚动；自动滚到最新不打扰上方状态读数 -->
+    <ScrollView
+        android:id="@+id/log_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_log"
+        android:padding="11dp"
+        android:scrollbars="vertical"
+        android:fadeScrollbars="false">
+
+        <TextView
+            android:id="@+id/tv_log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/ink_2"
+            android:textSize="10.5sp"
+            android:typeface="monospace"
+            android:lineSpacingExtra="4dp" />
+    </ScrollView>
+
+</LinearLayout>

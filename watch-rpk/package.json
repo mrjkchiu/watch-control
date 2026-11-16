@@ -1,0 +1,14 @@
+{
+  "name": "com.example.watchctl",
+  "version": "1.0.0",
+  "description": "手表端 Vela 快应用：经 @system.interconnect 把指令送给手机端 companion（单 APK 内置指令引擎，本地直调）",
+  "scripts": {
+    "start": "aiot start --watch",
+    "build": "aiot build",
+    "release": "aiot release"
+  },
+  "devDependencies": {
+    "@aiot-toolkit/jsc": "^1.0.3",
+    "aiot-toolkit": "^2.0.5"
+  }
+}

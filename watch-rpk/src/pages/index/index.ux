@@ -1,0 +1,440 @@
+<template>
+  <div class="page">
+    <!-- 常驻头部：连接状态永远是第一眼的读数，两个模式共用，状态优先 -->
+    <text if="{{stateOk}}" class="state state-ok">● {{ connState }}</text>
+    <text if="{{stateWarn}}" class="state state-warn">● {{ connState }}</text>
+    <text if="{{stateBad}}" class="state state-bad">● {{ connState }}</text>
+    <text class="status">{{ statusLine }}</text>
+    <input class="btn-connect" type="button" value="连接手机" onclick="connect" />
+
+    <!-- 模式切换：一行轻入口，渐进式披露。预设 ⇄ 自定义，互不挤占首屏 -->
+    <text class="mode-switch" onclick="toggleMode">{{ modeCaption }}</text>
+
+    <!-- ── 模式 A：预设指令（原有主界面，保持 3 主操作 + 折叠工具） ── -->
+    <text if="{{presetView}}" class="label">当前指令 · 轻点切换</text>
+    <text if="{{presetView}}" class="preset" onclick="nextPreset">{{ preset }}</text>
+    <input if="{{presetView}}" class="btn-primary" type="button" value="发到 DSH" onclick="sendDsh" />
+    <input if="{{presetView}}" class="btn-primary" type="button" value="发到 WorkBuddy" onclick="sendWorkbuddy" />
+
+    <!-- ── 模式 B：自定义指令（0.1.23 · 拼音输入法移到独立页面 pages/input） ──
+         0.1.20~0.1.22 把 623KB 输入法引擎内联进主页面，真机连续三版「装上就重启」。
+         0.1.23 对齐米坛能跑的做法：主页面保持 0.1.19 的轻量结构（无输入法），
+         点下方按钮跳到独立输入页打字；草稿经 app 全局对象回传，发送仍走主页面已建立的 bridge。
+         这样即使输入页在某固件上不兼容，主应用也能正常打开、预设指令照常可发。 -->
+    <text if="{{customView}}" class="label">指令内容 · 点下方输入</text>
+    <text if="{{customView}}" class="draft" onclick="openInput">{{ draftLine }}</text>
+    <input if="{{customView}}" class="btn-quiet" type="button" value="打开拼音输入法  ›" onclick="openInput" />
+    <input if="{{customView}}" class="btn-quiet" type="button" value="清空草稿" onclick="clearDraft" />
+
+    <input if="{{customView}}" class="btn-primary" type="button" value="发到 DSH" onclick="sendDraftDsh" />
+    <input if="{{customView}}" class="btn-primary" type="button" value="发到 WorkBuddy" onclick="sendDraftWb" />
+
+    <!-- 常驻结果区：两种模式的发送回执共用，如实标注各自通道 -->
+    <text class="result">{{ resultLine }}</text>
+    <text if="{{hasHint}}" class="hint">{{ hintLine }}</text>
+
+    <!-- 渐进式披露：低频工具默认收起；自定义模式下整块隐藏（纯 boolean，不用 && 表达式）。
+         0.1.17 沿用主界面信息架构：每组一个 .label 分组标题、按钮文案自解释（不再用两字缩写）、
+         只读/本地项 .btn-tool、有副作用项 .btn-caution（琥珀强调 + "! " 文字符号双重编码）。
+         0.1.19 删除假功能「打开引擎页」(dsh.open)：dshgo:// scheme 与 setPackage(WorkBuddy 包名)
+         错配、真机拉不起来，且属「看起来能用实际不能用」，直接移除而非修它。余 5 个工具。 -->
+    <input if="{{moreClosed}}" class="btn-more" type="button" value="更多工具  ▾" onclick="toggleMore" />
+    <input if="{{showMore}}" class="btn-more" type="button" value="收起工具  ▴" onclick="toggleMore" />
+    <div if="{{showMore}}" class="tools">
+      <text class="label">连接 · 本地操作（不发到手机）</text>
+      <input class="btn-tool" type="button" value="查看连接诊断" onclick="diagnose" />
+      <input class="btn-tool" type="button" value="断开连接 · 可再连" onclick="disconnect" />
+
+      <text class="label">dsh-go 引擎 · 查询</text>
+      <input class="btn-tool" type="button" value="查看引擎状态" onclick="refresh" />
+      <input class="btn-tool" type="button" value="列出会话" onclick="listSessions" />
+
+      <text class="label">会影响状态 · 谨慎操作</text>
+      <input class="btn-caution" type="button" value="! 中断当前会话" onclick="cancel" />
+    </div>
+  </div>
+</template>
+
+<script>
+import { createBridge } from '../../common/bridge.js'
+
+const PRESETS = [
+  '继续',
+  '停下来',
+  '总结一下刚才的进展',
+  '查一下今天的天气',
+  '帮我写今天的日报',
+  '列出待办并排个优先级',
+]
+
+// 0.1.13：新增 relink（曾连上、现掉线、自动重连中）。
+const STATE_TEXT = {
+  online: '已连接',
+  offline: '未连接',
+  connecting: '连接中',
+  relink: '重连中',
+  error: '连接出错',
+}
+
+// ── 0.1.23 拼音输入法拆到独立页面 pages/input ──
+// 主页面不再内联输入法引擎（避免启动加载期崩溃），自定义模式只负责跳转与发送。
+// 草稿经 app.$def.shared 在两页间共享；上限 200 由输入页 enforce（远小于手机端 500 截断）。
+
+export default {
+  private: {
+    connState: '未连接',
+    stateOk: false,
+    stateWarn: false,
+    stateBad: true,
+    statusLine: '点「连接手机」开始',
+    hintLine: '',
+    hasHint: false,
+    resultLine: '等待命令…',
+    preset: PRESETS[0],
+    presetIndex: 0,
+    showMore: false,
+    moreClosed: true,
+
+    // ── 0.1.23 自定义指令 · 拼音输入法独立页面 ──
+    presetView: true,          // 模式 A（预设）
+    customView: false,         // 模式 B（自定义），与 presetView 互为反
+    modeCaption: '自定义指令  ›',
+    draft: '',                 // 当前草稿原文（发送时用），与输入页经 app.$def.shared 同步
+    draftLine: '（空）· 点下方按钮输入',   // 草稿显示行（超长截尾，避免撑破手表单行）
+  },
+
+  // 应用级共享容器（app.ux 暴露的 $def.shared），拿不到时返回 null 让各方法降级到本地草稿
+  shared() {
+    try {
+      const def = this.$app && this.$app.$def
+      return (def && def.shared) ? def.shared : null
+    } catch (e) { return null }
+  },
+
+  onInit() {
+    // 只做纯 UI 初始化与回调绑定，不在此触碰原生互联模块。
+    // 互联 instance() 延迟到用户点「连接手机」时才调用；diagnosis() 本固件无，永不调用。
+    this.bridge = createBridge({
+      onState: (state) => {
+        this.connState = STATE_TEXT[state] || state
+        this.stateOk = state === 'online'
+        this.stateWarn = state === 'connecting' || state === 'relink'
+        this.stateBad = state === 'offline' || state === 'error'
+      },
+      onDiag: (text) => { this.statusLine = text },
+      onHint: (text) => { this.setHint(text) },
+      onMessage: (msg) => {
+        const mark = msg.ok === false ? '✗ ' : '✓ '
+        this.resultLine = mark + (msg.text || (msg.ok ? '已完成' : '失败'))
+        if (msg.code === 'timeout') {
+          this.setHint('未自动重发；手机端可能仍在执行，先看面板再决定是否重发')
+        } else if (!msg.ok) {
+          this.setHint('看手机面板：WorkBuddy 通道需 root / 组件')
+        } else if (msg.duplicate) {
+          this.setHint('重复指令已忽略（不会重复执行）')
+        } else if (msg.cmd === 'wb.prompt' || msg.target === 'WorkBuddy' || msg.stage === 'prefill') {
+          this.setHint('已发到 WorkBuddy 输入框（预填）· 需在手机点「发送」')
+        } else if (msg.cmd === 'dsh.prompt' || msg.target === 'dsh-go') {
+          this.setHint('已写入 dsh-go 引擎会话（与 WorkBuddy 是两回事）')
+        }
+      },
+    })
+    // 把已建立的 bridge 挂到应用级共享容器，供独立输入页发送时复用（不另起状态机）
+    const sh = this.shared()
+    if (sh) sh.bridge = this.bridge
+  },
+
+  // 从输入页返回时（onShow）读回草稿；独立页面把草稿写进 shared.draft
+  onShow() {
+    const sh = this.shared()
+    if (sh && typeof sh.draft === 'string') {
+      this.draft = sh.draft
+      this.refreshDraft()
+    }
+  },
+
+  // 提示统一入口：空文本即隐藏整行，避免占位空行（0.1.14 去噪）
+  setHint(text) {
+    this.hintLine = text || ''
+    this.hasHint = !!text
+  },
+
+  onDestroy() {
+    try { this.bridge && this.bridge.close() } catch (e) { console.error(e) }
+  },
+
+  connect() {
+    this.bridge.open()
+  },
+
+  disconnect() {
+    try { this.bridge && this.bridge.close() } catch (e) { console.error(e) }
+    this.statusLine = '已断开'
+    this.setHint('点「连接手机」重新开始（自动心跳 + 断线重连）')
+    this.resultLine = '等待命令…'
+  },
+
+  diagnose() { this.bridge.diagnose() },
+
+  nextPreset() {
+    this.presetIndex = (this.presetIndex + 1) % PRESETS.length
+    this.preset = PRESETS[this.presetIndex]
+  },
+
+  // 0.1.16 模式切换：切到自定义时把折叠工具整块收掉，首屏不被低频工具占空间。
+  // 全程纯 boolean，无 && 表达式。
+  toggleMode() {
+    this.presetView = !this.presetView
+    this.customView = !this.presetView
+    this.modeCaption = this.customView ? '‹ 返回预设指令' : '自定义指令  ›'
+    if (this.customView) {
+      this.showMore = false
+      this.moreClosed = false
+    } else {
+      this.showMore = false
+      this.moreClosed = true
+    }
+  },
+
+  toggleMore() {
+    this.showMore = !this.showMore
+    this.moreClosed = !this.showMore
+  },
+
+  // 0.1.23：拼音输入法在独立页面 pages/input，主页面只负责跳转。
+  // 用 router.push（无需声明 feature），异常时如实提示，不冒充打开成功。
+  openInput() {
+    try {
+      const router = require('@system.router')
+      router.push({ uri: '/pages/input' })
+    } catch (e) {
+      this.resultLine = '无法打开输入页'
+      this.setHint('本固件可能未提供页面跳转能力')
+    }
+  },
+
+  // 草稿行只显示尾部若干字（手表单行），但带头显示总字数，发送始终用完整 this.draft，
+  // 不会因显示截断而丢内容。
+  refreshDraft() {
+    const t = this.draft || ''
+    const shown = t.length > 12 ? '…' + t.slice(-12) : t
+    this.draftLine = t ? (t.length + ' 字 · ' + shown) : '（空）· 点下方按钮输入'
+  },
+
+  // 清空本地与共享草稿，输入页下次打开也会是空的
+  clearDraft() {
+    this.draft = ''
+    const sh = this.shared()
+    if (sh) sh.draft = ''
+    this.refreshDraft()
+    this.resultLine = '草稿已清空'
+    this.setHint('')
+  },
+
+  send(cmd, args) {
+    if (!this.bridge.started) {
+      this.resultLine = '请先点「连接手机」'
+      return
+    }
+    this.resultLine = '发送中…'
+    this.bridge.send({ cmd, args: args || {} })
+  },
+
+  // 自定义草稿发送：复用现有两条独立通道，仅把 text 从预设换成草稿。
+  // 草稿以共享对象为准（输入页写的），onShow 未触发时也能拿到最新内容；共享不可用则退回本地。
+  // 空草稿不发送、不冒充成功；dsh-go 与 WorkBuddy 仍各自如实回执，绝不混为一谈。
+  sendDraft(cmd) {
+    const sh = this.shared()
+    const src = (sh && typeof sh.draft === 'string') ? sh.draft : (this.draft || '')
+    const text = src.trim()
+    if (!text) {
+      this.resultLine = '草稿为空 · 请先输入指令'
+      this.setHint('点「打开拼音输入法」在独立页面输入，发送用完整草稿')
+      return
+    }
+    this.send(cmd, { text: text })
+  },
+  sendDraftDsh() { this.sendDraft('dsh.prompt') },
+  sendDraftWb() { this.sendDraft('wb.prompt') },
+
+  // 0.1.12 起两个入口是【两条独立通道】，各自如实回执，互不冒充：
+  //   dsh.prompt → DshClient → 引擎 session/prompt（写入 dsh-go 会话）
+  //   wb.prompt  → root am start → .ShareAddToChat（预填进 WorkBuddy 输入框，需点发送）
+  sendDsh() { this.send('dsh.prompt', { text: this.preset }) },
+  sendWorkbuddy() { this.send('wb.prompt', { text: this.preset }) },
+  refresh() { this.send('status') },
+  listSessions() { this.send('dsh.list') },
+  cancel() { this.send('dsh.cancel') },
+}
+</script>
+
+<style>
+/* 深色工业仪表（impeccable 迁移）：distill 去噪、typography 层级、
+   color 单一琥珀强调 + 语义色（与文字符号双重编码）、spatial 线性流。
+   0.1.16 自定义指令沿用同一套：模式切换为轻入口、词块/字符键盘默认折叠、
+   两条发送键仍是唯一主操作、低频工具折叠。
+   0.1.17「更多工具」补齐同一套：分组 label、自解释文案、色板统一
+   （清除 0.1.14 遗留的一处色板外杂色）、有副作用项用琥珀强调分级。
+   居中修复：.page 用 align-items:center 让定宽元素整体水平居中，各元素再加
+   align-self:center 双保险；按钮内文字仍 text-align:center —— 按钮与标题都居中。
+   0.1.21 第十六次修正：真机反馈按钮偏小不好按 —— 全体按钮高度 +8~12px、字号 +2~3px、
+   按钮间距(margin-top) +4~6px；只改尺寸与间距，圆角/色板/居中设计语言与全部逻辑不变。
+   Vela CSS 子集约束：不用 absolute、不用 flex:1、每个元素显式 height。 */
+/* 0.1.25 视觉精化：内容整体垂直居中（收紧间距实现，不缩小按钮，
+   也不改任何 template/JS/按钮 onclick）。方形屏竖向空间接近一屏，
+   收紧 margin 后常规状态可完整居中；长提示时可轻微滚动，不裁切顶部状态。 */
+.page {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 16px;
+  background-color: #0E1419;
+}
+.state {
+  font-size: 30px;
+  height: 46px;
+  font-weight: bold;
+  text-align: center;
+}
+.state-ok   { color: #5FBF8A; }
+.state-warn { color: #E0A458; }
+.state-bad  { color: #E2665C; }
+.status {
+  font-size: 14px;
+  height: 26px;
+  color: #7D8B96;
+  text-align: center;
+}
+.btn-connect {
+  width: 400px;
+  height: 62px;
+  margin-top: 7px;
+  border-radius: 14px;
+  background-color: #1D2832;
+  font-size: 21px;
+  color: #E6EDF2;
+  text-align: center;
+  align-self: center;
+}
+/* 模式切换：琥珀文字轻入口，视觉权重明显低于两个主发送键 */
+.mode-switch {
+  width: 400px;
+  font-size: 17px;
+  height: 42px;
+  margin-top: 8px;
+  color: #E0A458;
+  text-align: center;
+  align-self: center;
+}
+.label {
+  font-size: 13px;
+  height: 28px;
+  margin-top: 8px;
+  color: #7D8B96;
+  text-align: center;
+  align-self: center;
+}
+.preset {
+  font-size: 24px;
+  height: 50px;
+  color: #E0A458;
+  text-align: center;
+  align-self: center;
+}
+.btn-primary {
+  width: 400px;
+  height: 64px;
+  margin-top: 8px;
+  border-radius: 14px;
+  background-color: #E0A458;
+  font-size: 23px;
+  font-weight: bold;
+  color: #20160A;
+  text-align: center;
+  align-self: center;
+}
+/* 草稿显示行：只读 text（不依赖系统输入法），surface 底 + 亮色文字，居中 */
+.draft {
+  width: 400px;
+  height: 62px;
+  margin-top: 7px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  background-color: #1D2832;
+  font-size: 19px;
+  color: #E6EDF2;
+  text-align: center;
+  align-self: center;
+}
+/* 0.1.23：拼音键盘样式随组件移到独立页面 pages/input；
+   本页 .btn-quiet 现用于「打开拼音输入法」跳转与「清空草稿」两个入口。 */
+.btn-quiet {
+  width: 400px;
+  height: 50px;
+  margin-top: 8px;
+  border-radius: 12px;
+  background-color: #172029;
+  font-size: 17px;
+  color: #7D8B96;
+  text-align: center;
+  align-self: center;
+}
+.result {
+  font-size: 17px;
+  height: 40px;
+  margin-top: 7px;
+  color: #E6EDF2;
+  text-align: center;
+  align-self: center;
+}
+.hint {
+  font-size: 13px;
+  height: 30px;
+  color: #7D8B96;
+  text-align: center;
+  align-self: center;
+}
+.btn-more {
+  width: 400px;
+  height: 56px;
+  margin-top: 10px;
+  border-radius: 12px;
+  background-color: #172029;
+  font-size: 18px;
+  color: #7D8B96;
+  text-align: center;
+  align-self: center;
+}
+.tools {
+  width: 400px;
+  flex-direction: column;
+  align-items: center;
+  align-self: center;
+}
+/* 更多工具 · 只读 / 本地项：与主界面次级控件同款（surface 底 + 主文字），
+   全部取既有色板；删掉 0.1.14 遗留的一处色板外杂色。 */
+.btn-tool {
+  width: 400px;
+  height: 54px;
+  margin-top: 8px;
+  border-radius: 12px;
+  background-color: #172029;
+  font-size: 18px;
+  color: #E6EDF2;
+  text-align: center;
+  align-self: center;
+}
+/* 更多工具 · 有副作用项：单一琥珀强调 + "! " 文字符号 + 分组 label「谨慎操作」，
+   三重编码区分层级。尺寸 / 圆角 / 居中与只读项完全一致，不新增语义色。 */
+.btn-caution {
+  width: 400px;
+  height: 54px;
+  margin-top: 8px;
+  border-radius: 12px;
+  background-color: #1D2832;
+  font-size: 18px;
+  color: #E0A458;
+  text-align: center;
+  align-self: center;
+}
+</style>

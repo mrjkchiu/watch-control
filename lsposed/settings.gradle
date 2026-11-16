@@ -1,0 +1,17 @@
+pluginManagement {
+    repositories {
+        maven { url 'https://dl.google.com/dl/android/maven2/' }  // google() 在沙箱出网被封，改用可达镜像
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        maven { url 'https://dl.google.com/dl/android/maven2/' }  // google() 镜像
+        mavenCentral()
+        maven { url 'https://api.xposed.info/' }   // de.robv.android.xposed:api
+    }
+}
+rootProject.name = 'WatchCtlHook'
+include ':app'

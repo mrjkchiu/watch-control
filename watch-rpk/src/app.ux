@@ -1,0 +1,22 @@
+<script>
+// 0.1.23（第十八次修正）：应用级共享容器。
+// app.ux 编译成全局唯一的 app.js，export default 的对象通过 this.$app.$def 被所有页面共享。
+// 拼音输入法拆到独立页面 pages/input 后，主页面与输入页借此共享：
+//   - draft ：当前自定义指令草稿（输入页写、主页面 onShow 读回显示/发送）
+//   - bridge：主页面 onInit 建立的互联实例（输入页发送时复用，避免两个页面各起一套状态机）
+// 全部通过纯 JS 对象传递，不引入任何系统能力/权限。
+const shared = {
+  draft: '',
+  bridge: null,
+}
+
+export default {
+  shared: shared,
+  onCreate() {
+    console.info('[watchctl] app created')
+  },
+  onDestroy() {
+    console.info('[watchctl] app destroyed')
+  }
+}
+</script>

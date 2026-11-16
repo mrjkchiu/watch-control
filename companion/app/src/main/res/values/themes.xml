@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自定义主题替换系统默认 Theme.Material（原来 res/ 为空、图标用 @android:drawable/ic_dialog_info）。
+  基于 framework Theme.Material.NoActionBar（深色）；工程无 AppCompat/Material 依赖，不引入第三方。
+  状态栏/导航栏与背景同色，windowDrawsSystemBarBackgrounds 让深色延伸到系统栏。
+-->
+<resources>
+    <style name="Theme.WatchCtl" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:textColorPrimary">@color/ink</item>
+        <item name="android:textColorSecondary">@color/ink_2</item>
+        <item name="android:textColorHint">@color/ink_3</item>
+        <!-- 系统 AlertDialog（使用说明）也跟着深色，避免弹窗白底刺眼 -->
+        <item name="android:alertDialogTheme">@android:style/Theme.Material.Dialog.Alert</item>
+    </style>
+</resources>

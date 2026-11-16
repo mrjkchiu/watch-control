@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自有矢量图标：腕表表盘 + 指针 + 表冠，替换原来的 @android:drawable/ic_dialog_info。
+  深色 tinted 圆底 + 琥珀单色线条，与界面 accent 呼应；不含 AI slop 的渐变/发光/圆角大图标。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- 圆底：极轻冷色偏，非纯黑 -->
+    <path
+        android:fillColor="@color/surface_2"
+        android:pathData="M3,24 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 Z" />
+
+    <!-- 表盘内圈 -->
+    <path
+        android:pathData="M24,12 a12,12 0 1,0 0,24 a12,12 0 1,0 0,-24 Z"
+        android:strokeColor="@color/accent"
+        android:strokeWidth="2.4"
+        android:fillColor="@android:color/transparent" />
+
+    <!-- 指针（时/分） -->
+    <path
+        android:pathData="M24,24 L24,16 M24,24 L29,27"
+        android:strokeColor="@color/ink"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round" />
+
+    <!-- 表冠 -->
+    <path
+        android:fillColor="@color/accent"
+        android:pathData="M35,22 h3 v4 h-3 Z" />
+</vector>

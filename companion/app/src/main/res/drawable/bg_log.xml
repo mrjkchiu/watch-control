@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 日志容器：surface 底 + 10dp 圆角。日志区是唯一需要「容器」的地方（可读分组），不套卡片。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/surface" />
+    <corners android:radius="10dp" />
+</shape>

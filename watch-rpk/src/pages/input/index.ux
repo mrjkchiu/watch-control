@@ -1,0 +1,165 @@
+<import name="input-method" src="../../components/InputMethod/InputMethod.ux"></import>
+<template>
+  <div class="page">
+    <!-- 输入页：键盘贴底占下半屏，上半屏只放一条草稿读数 + 两个操作入口。
+         发送统一回主页面（复用已建立的 bridge），本页只负责打字与同步草稿，
+         不碰互联 —— 这样即使本页在某些固件上不兼容，主应用仍可正常打开。 -->
+    <text class="draft">{{ draftLine }}</text>
+    <div class="bar">
+      <input class="btn-mini" type="button" value="清空" onclick="clearDraft" />
+      <input class="btn-mini btn-mini-main" type="button" value="完成 · 返回" onclick="back" />
+    </div>
+    <text class="result">{{ resultLine }}</text>
+
+    <!-- 拼音键盘：本页唯一载体，圆屏 QWERTY 全键盘 + 中文拼音候选，贴底渲染。
+         complete 吐出选中文字、delete 吐出退格，写入 draft 并同步到共享对象。 -->
+    <input-method
+      hide="{{imeHide}}"
+      keyboardtype="QWERTY"
+      maxlength="5"
+      vibratemode=""
+      screentype="circle"
+      @complete="onImeComplete"
+      @delete="onImeDelete"
+    ></input-method>
+  </div>
+</template>
+
+<script>
+// 草稿上限：手机端 WbIngress 截 500 字，表端先限 200，任何通道都不会触发静默截断。
+const DRAFT_MAX = 200
+
+export default {
+  private: {
+    draft: '',
+    draftLine: '（空）· 在下方键盘输入',
+    imeHide: false,
+    resultLine: '输入后点「完成 · 返回」回主界面发送',
+  },
+
+  // 应用级共享容器（app.ux 的 $def.shared）：草稿在这里，主页面 onShow 读回
+  shared() {
+    try {
+      const def = this.$app && this.$app.$def
+      return (def && def.shared) ? def.shared : null
+    } catch (e) { return null }
+  },
+
+  onInit() {
+    const sh = this.shared()
+    if (sh && typeof sh.draft === 'string') this.draft = sh.draft
+    this.refreshDraft()
+  },
+
+  onHide() {
+    // 页面被覆盖/返回前把最新草稿写回共享对象（配合 onDestroy 双保险，不依赖单一时机）
+    this.syncDraft()
+  },
+
+  onDestroy() {
+    this.syncDraft()
+  },
+
+  refreshDraft() {
+    const t = this.draft || ''
+    const shown = t.length > 12 ? '…' + t.slice(-12) : t
+    this.draftLine = t ? (t.length + ' 字 · ' + shown) : '（空）· 在下方键盘输入'
+  },
+
+  syncDraft() {
+    const sh = this.shared()
+    if (sh) sh.draft = this.draft || ''
+  },
+
+  onImeComplete(evt) {
+    const s = evt && evt.detail ? evt.detail.content : ''
+    if (!s) return
+    const cur = this.draft || ''
+    if (cur.length + s.length > DRAFT_MAX) {
+      this.resultLine = '已达 ' + DRAFT_MAX + ' 字上限'
+      return
+    }
+    this.draft = cur + s
+    this.syncDraft()
+    this.refreshDraft()
+    this.resultLine = '草稿 ' + this.draft.length + '/' + DRAFT_MAX + ' 字'
+  },
+
+  onImeDelete() {
+    this.draft = (this.draft || '').slice(0, -1)
+    this.syncDraft()
+    this.refreshDraft()
+    this.resultLine = this.draft ? '草稿 ' + this.draft.length + '/' + DRAFT_MAX + ' 字' : '草稿已退空'
+  },
+
+  clearDraft() {
+    this.draft = ''
+    this.syncDraft()
+    this.refreshDraft()
+    this.resultLine = '草稿已清空'
+  },
+
+  back() {
+    this.syncDraft()
+    try {
+      const router = require('@system.router')
+      router.back()
+    } catch (e) {
+      this.resultLine = '无法返回 · 请用系统返回键'
+    }
+  },
+}
+</script>
+
+<style>
+/* 与主界面同一套深色工业仪表设计语言；键盘组件自带 position:absolute; bottom:0，
+   故本页上半只放草稿读数 + 一行紧凑操作条，元素显式高度、全部居中。 */
+.page {
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: #0E1419;
+}
+.draft {
+  width: 400px;
+  height: 54px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background-color: #1D2832;
+  font-size: 18px;
+  color: #E6EDF2;
+  text-align: center;
+  align-self: center;
+}
+.bar {
+  width: 400px;
+  flex-direction: row;
+  justify-content: center;
+  margin-top: 8px;
+  align-self: center;
+}
+.btn-mini {
+  width: 190px;
+  height: 48px;
+  margin: 0 5px;
+  border-radius: 12px;
+  background-color: #172029;
+  font-size: 16px;
+  color: #E6EDF2;
+  text-align: center;
+}
+.btn-mini-main {
+  background-color: #E0A458;
+  color: #20160A;
+  font-weight: bold;
+}
+.result {
+  width: 400px;
+  font-size: 12px;
+  height: 26px;
+  margin-top: 6px;
+  color: #7D8B96;
+  text-align: center;
+  align-self: center;
+}
+</style>

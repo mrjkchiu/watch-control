@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  配色：深色工业仪表风。按 impeccable 的 color-and-contrast 规范落地到 Android：
+  · tinted neutral —— 中性色带极轻冷色偏，不用纯黑 #000 / 纯白 #fff；
+  · 60-30-10 —— 中性背景 60% / 文字与读数 30% / 琥珀强调 10%；
+  · 单一强调色 accent(琥珀) + 4 个语义色；语义色必须与 ✓/✗ 文字符号同时出现，
+    不靠颜色单独传达信息（兼容色盲）；
+  · 对比度：ink/ink2/ink3/ok/bad/accent 对 bg 均 >= 4.5:1（正文 AA）。
+  Android 不支持 oklch，用等价 sRGB 值，但保留 tinted neutral 与降低高亮度的意图。
+-->
+<resources>
+    <color name="bg">#FF0E1419</color>
+    <color name="surface">#FF172029</color>
+    <color name="surface_2">#FF1D2832</color>
+    <color name="line">#FF2A3742</color>
+
+    <color name="ink">#FFE6EDF2</color>
+    <color name="ink_2">#FFAAB8C2</color>
+    <color name="ink_3">#FF7D8B96</color>
+
+    <color name="accent">#FFE0A458</color>
+    <color name="accent_pressed">#FFC88C42</color>
+    <color name="on_accent">#FF20160A</color>
+
+    <color name="ok">#FF5FBF8A</color>
+    <color name="bad">#FFE2665C</color>
+    <color name="warn">#FFE0A458</color>
+    <color name="idle">#FF7D8B96</color>
+</resources>

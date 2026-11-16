@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.watchctl'
+    compileSdk 34
+    archivesBaseName = 'watchctl-companion'
+
+    signingConfigs {
+        watchctl {
+            storeFile file('/workspace/watch-control/keys/watchctl.keystore.p12')
+            storePassword 'watchctl'
+            keyAlias 'watchctl'
+            keyPassword 'watchctl'
+            storeType 'PKCS12'
+        }
+    }
+
+    defaultConfig {
+        applicationId 'com.example.watchctl'
+        minSdk 29
+        targetSdk 34
+        versionCode 22
+        versionName '0.1.21'
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.watchctl
+        }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.watchctl
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// 小米穿戴官方 SDK（xms-wearable-lib_1.4_release.aar，来自官方 interconnect_dev_test_demo）
+// 提供 Wearable / NodeApi / MessageApi，是表端 @system.interconnect 的手机侧对端实现。
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
+}

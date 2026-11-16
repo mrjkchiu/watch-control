@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- LSPosed 推荐作用域：必须是 WorkBuddy 进程的实际包名，填错则模块根本不会注入。
+         已按 K90 Max 实测填写 com.tencent.workbuddy.app（腾讯 WorkBuddy 官方包）。
+         注意：com.example.watchctl 是自写 companion/表端 rpk 的包名，与此处无关。
+
+         ⚠️ 默认【不要】把 android 放进作用域！
+         模块真正干活（收 companion 广播 → 调 dsh-go 引擎 → 发 WorkBuddy intent → 回结果广播）
+         全在「模块自身进程」里由 RelayService 完成，不需要 hook 系统框架。
+         把 android 勾上会让模块代码被加载进 system_server，一旦有异常会直接整机重启
+         （本项目的"点应用就重启"就是这个原因）。
+         android 只服务于一个默认关闭的「后台启动放行」hook，需要时才手动加。 -->
+    <string-array name="module_scope">
+        <item>com.tencent.workbuddy.app</item>
+    </string-array>
+</resources>

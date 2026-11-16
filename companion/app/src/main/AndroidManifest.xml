@@ -1,0 +1,47 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Android 11+ 包可见性：xms-wearable SDK 需绑定小米穿戴/运动健康服务；
+         0.1.8 单 APK 合并后还要能探测 WorkBuddy 是否安装。
+         0.1.16 主次修正：删除语音识别服务声明与录音权限，
+         手机端不再做任何语音识别/文字输入；自定义指令全部在手表端内置面板本地完成。 -->
+    <queries>
+        <package android:name="com.xiaomi.wearable" />
+        <package android:name="com.mi.health" />
+        <package android:name="com.tencent.workbuddy.app" />
+    </queries>
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- dataSync 为 normal 权限，安装即授予；不需要 BLUETOOTH_CONNECT 等运行时权限 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 0.1.8：内置 DshClient 要访问 dsh-go 引擎 127.0.0.1:3080（HTTP） -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:label="腕控伴侣"
+        android:icon="@drawable/ic_watchctl"
+        android:theme="@style/Theme.WatchCtl"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="腕控伴侣">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Android 14(targetSdk34) 要求前台服务必须声明 type，且 type 要与
+             startForeground 传入的一致，否则抛 MissingForegroundServiceTypeException。
+             这里用 dataSync：只需 normal 权限，规避 connectedDevice 的蓝牙运行时权限校验。
+             前台服务与 SDK 初始化已彻底解耦，即使极端情况下失败也不会阻断互联。 -->
+        <service
+            android:name=".CompanionService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:process=":relay" />
+    </application>
+</manifest>
