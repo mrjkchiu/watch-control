@@ -15,13 +15,13 @@ import java.util.concurrent.TimeUnit;
  * (com.tencent.workbuddy.app, 腾讯 Flutter App) 是两个完全不同的东西。
  * 用户真机实测「dsh 写入成功、WorkBuddy 里完全没有」正是两者不同的铁证。
  *
- * 【前期真机调研已验收的唯一入口】scripts/wb-a1.sh（A1 结论）：
+ * 【真机验收过的唯一入口】：
  *   su -c 'am start -a android.intent.action.SEND -t text/plain \
  *          --es android.intent.extra.TEXT "<文本>" \
  *          -n com.tencent.workbuddy.app/.ShareAddToChat'
  *   把文本【预填进 WorkBuddy 会话输入框】，需手点一次「发送」才会执行。
  *
- * 方案.md §4.9/§4.10：AOSP ActivityStarter.shouldAbortBackgroundActivityStart
+ * AOSP ActivityStarter.shouldAbortBackgroundActivityStart
  * 豁免 ROOT_UID / SHELL_UID / SYSTEM_UID，所以【root shell 执行的 am start】
  * 不受 Android 10+ / Android 16 后台启动 Activity 限制。这跟 0.1.2 删掉的
  * 「App 进程内 ctx.startActivity()」是两码事——被拦的是后者，不是这条入口。
@@ -146,7 +146,7 @@ public final class WbIngress {
                     "未检测到 WorkBuddy(" + WB_PACKAGE + ")：pm path 无结果");
         }
 
-        // 与 scripts/wb-a1.sh 完全一致的 intent；文本用 POSIX 单引号转义防注入
+        // 真机验收过的 intent；文本用 POSIX 单引号转义防注入
         String script = "am start -a android.intent.action.SEND -t text/plain"
                 + " --es android.intent.extra.TEXT " + shQuote(text)
                 + " -n " + WB_PACKAGE + "/" + SHARE_COMPONENT;

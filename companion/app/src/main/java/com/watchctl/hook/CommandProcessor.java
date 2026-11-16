@@ -28,7 +28,7 @@ import java.util.UUID;
  *       companion.handleWatchFrame → ModuleBridge(线程池) → 本类.handle(..., ResultSink)
  *       → 结果回调 → CompanionService.deliverToWatch → BLE 回表。
  *       不再有 com.watchctl.CMD / com.watchctl.RESULT 跨进程广播，也不依赖 LSPosed；
- *       sendResult() 只保留给无 sink 的兼容路径。下面 0.1.1 的广播描述为历史留档。
+ *       sendResult() 只保留给无 sink 的兼容路径。
  *
  * 0.1.2 → 0.1.3 方向性纠错（用户真机实测：「WorkBuddy 里完全没有」）：
  *   0.1.2 犯了一个没证据的臆断——把「dsh-go 引擎会话」当成了「WorkBuddy」，
@@ -41,7 +41,7 @@ import java.util.UUID;
  *     · dsh.prompt  → DshClient session/prompt → dsh-go 引擎会话（真机已验证可写入）
  *                     target=dsh-go，delivered=true，文案「已写入 dsh-go 引擎会话」
  *     · wb.prompt   → WbIngress.send() → root shell `am start ... .ShareAddToChat`
- *                     （前期 scripts/wb-a1.sh A1 真机验收：文本预填进 WorkBuddy 输入框）
+ *                     （真机验收：文本预填进 WorkBuddy 输入框）
  *                     target=WorkBuddy，launched=true 但 delivered=false / stage=prefill
  *                     —— 预填 ≠ 执行，绝不再替 WorkBuddy 宣布「已送达/已写入」。
  *   两条通道的 ok/delivered/target/via/stage 都按各自事实填，不共用文案。
@@ -270,7 +270,7 @@ public final class CommandProcessor {
             // 0.1.12 删除 dsh.open：dshgo://open/<page> 用 setPackage(cfg.wbPackage)
             // 定向给 WorkBuddy 包名，scheme 与包名错配，真机必然拉不起来；且后台启动
             // Activity 本身会被系统拦截。这是「看起来能用实际不能用」的假功能，
-            // 表端按钮、白名单、手机端 case 一起移除（见 README 第十四次修正）。
+            // 表端按钮、白名单、手机端 case 一起移除。
             default:
                 throw new RelayException("unknown-command", "未知命令: " + cmd);
         }

@@ -18,7 +18,7 @@ import java.util.UUID;
 
 /**
  * dsh-go 本机引擎客户端（127.0.0.1:3080）。
- * 协议与 relay/src/dsh.js 完全一致：
+ * 协议（dsh-go v1.0.16 源码逐行核对）：
  *   - GET /?token=<launch token> → 303 + Set-Cookie: dsh-auth-...（登录）
  *   - POST /api/<endpoint> 带 client-request 信封；Host 由 URL 自动为 127.0.0.1:3080
  *   - 业务错误是 HTTP 200 + result.ok:false

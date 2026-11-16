@@ -1,6 +1,0 @@
-id=watchctl_relay
-name=Watch Control Relay
-version=0.1.0
-versionCode=1
-author=watch-control
-description=Boot-start the loopback relay that forwards REDMI Watch 6 interconnect commands to dsh-go and WorkBuddy.

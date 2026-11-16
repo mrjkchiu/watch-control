@@ -37,7 +37,7 @@ comp = find_one('companion/app/build/outputs/apk/release/*.apk')
 if comp is None:
     raise SystemExit('找不到 companion release APK，请先执行 ./gradlew assembleRelease')
 
-# 清空交付目录（只删文件，保留目录），杜绝旧名残留（含旧 module-*.apk）
+# 清空交付目录（只删文件，保留目录），杜绝旧名残留
 os.makedirs(out, exist_ok=True)
 for f in os.listdir(out):
     p = os.path.join(out, f)

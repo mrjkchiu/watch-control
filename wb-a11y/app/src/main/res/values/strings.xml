@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">WB 自动发送（手表遥控）</string>
-    <string name="a11y_summary">手表经 relay 发指令时，自动点 WorkBuddy 的「发送」按钮</string>
-    <string name="a11y_desc">本服务仅在收到「手表遥控」relay 的武装广播后的 6 秒时间窗内，于 WorkBuddy（com.tencent.workbuddy.app）窗口中自动点击一次「发送」按钮，把预填进输入框的指令发出。平时完全静默，不读取、不上传任何输入内容。用于在红米 Watch 6 上通过手表实时控制 WorkBuddy 的全无人值守闭环。</string>
-</resources>

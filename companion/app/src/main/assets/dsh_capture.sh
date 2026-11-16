@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # dsh_capture.sh —— companion 0.1.14 自愈保底：自起一个 dsh web 引擎，抓明文 launch token。
-# 来源：项目内已被真机验证过的 scripts/capture-dsh-token.sh（token 只从引擎自己 stdout 出，
-# 不经过 dsh-go App 的 LogRedactor 脱敏层）。companion 拿到 token 后走标准 GET /?token= 换 cookie。
+# token 只从引擎自己 stdout 出，不经过 dsh-go App 的 LogRedactor 脱敏层；
+# companion 拿到 token 后走标准 GET /?token= 换 cookie。
 # 副作用：会短暂 kill 现有引擎并重启一个（用户已知悉并同意此短暂中断）。最终只打印一行 TOKEN=xxx。
 PKG="io.github.ccch1mneyyy.dsh_app"
 ROOTFS="/data/user/0/$PKG/files/runtime/rootfs"
